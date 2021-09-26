@@ -24,6 +24,11 @@ function benchmark_file(filename::String; kwargs...)
 end
 
 function benchmark(; kwargs...)
+    # Run once for precompilation
+    benchmark_file(
+        joinpath(@__DIR__, "models", "sldp_example_two_2.sof.json.gz");
+        kwargs...,
+    )
     solutions = Dict{String,Any}()
     for file in readdir(joinpath(@__DIR__, "models"))
         filename = joinpath(@__DIR__, "models", file)
@@ -32,7 +37,6 @@ function benchmark(; kwargs...)
     time = Dates.format(Dates.now(), "Y_mm_dd_HHMM")
     data = Dict(
         "date" => time,
-        "config" => kwargs,
         "solutions" => solutions,
     )
     open("benchmark_$(time).json", "w") do io
@@ -51,7 +55,6 @@ function _report_columns(filename)
         avg_bound = map(m -> d[m]["time_weighted_bound"], models),
         total_time = map(m -> d[m]["total_time"], models),
         total_solves = map(m -> d[m]["total_solves"], models),
-        config = data["config"],
     )
 end
 
@@ -65,9 +68,6 @@ function _summarize(io, filename_A)
     println(io, "```")
     println(io, "filename: $(filename_A)")
     A = _report_columns(filename_A)
-    for (key, val) in A.config
-        println(io, "$(key): $(val)")
-    end
     println(io, "```\n")
     data = hcat(
         A.models,
@@ -127,14 +127,16 @@ function report(io::IO, filename_A::String, filename_B::String)
     return
 end
 
-# filename_A = benchmark(
-#     time_limit = 3,
-#     stopping_rules = [SDDP.BoundStalling(10, 1e-6)],
-# )
+filename_A = benchmark(
+    time_limit = 60,
+    stopping_rules = [SDDP.BoundStalling(10, 1e-6)],
+    duality_handler = SDDP.ContinuousConicDuality(),
+)
 
-# filename_B = benchmark(
-#     time_limit = 3,
-#     stopping_rules = [SDDP.BoundStalling(10, 1e-6)],
-# )
+filename_B = benchmark(
+    time_limit = 60,
+    stopping_rules = [SDDP.BoundStalling(10, 1e-6)],
+    duality_handler = SDDP.BanditDuality(),
+)
 
-# report(filename_A, filename_B)
+report(filename_A, filename_B)
