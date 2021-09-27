@@ -14,12 +14,13 @@ function benchmark_file(filename::String; kwargs...)
     for i in 2:length(log)
         time_weighted_bound += log[i].bound * (log[i].time - log[i-1].time)
     end
+    sign = model.objective_sense == MOI.MAX_SENSE ? -1 : 1
     return (
-        best_bound = log[end].bound,
-        total_time = log[end].time,
+        best_bound = sign * log[end].bound,
+        total_time = sign * log[end].time,
         total_solves = log[end].total_solves,
         time_weighted_bound = time_weighted_bound / log[end].time,
-        bound = map(l -> l.bound, log),
+        bound = map(l -> sign * l.bound, log),
     )
 end
 
@@ -30,15 +31,15 @@ function benchmark(; kwargs...)
         kwargs...,
     )
     solutions = Dict{String,Any}()
-    for file in readdir(joinpath(@__DIR__, "models"))
+    models = readdir(joinpath(@__DIR__, "models"))
+    # Precompile to avoid polluting the results!
+    benchmark_file(joinpath(@__DIR__, "models", models[1]); kwargs...)
+    for file in models
         filename = joinpath(@__DIR__, "models", file)
         solutions[file] = benchmark_file(filename; kwargs...)
     end
-    time = Dates.format(Dates.now(), "Y_mm_dd_HHMM")
-    data = Dict(
-        "date" => time,
-        "solutions" => solutions,
-    )
+    time = Dates.format(Dates.now(), "Y_mm_dd_HHMM_SS")
+    data = Dict("date" => time, "solutions" => solutions)
     open("benchmark_$(time).json", "w") do io
         write(io, JSON.json(data))
     end
@@ -127,16 +128,14 @@ function report(io::IO, filename_A::String, filename_B::String)
     return
 end
 
-filename_A = benchmark(
-    time_limit = 60,
-    stopping_rules = [SDDP.BoundStalling(10, 1e-6)],
-    duality_handler = SDDP.ContinuousConicDuality(),
-)
+#=
+filename_A = benchmark(time_limit = 3)
 
 filename_B = benchmark(
-    time_limit = 60,
+    time_limit = 3,
     stopping_rules = [SDDP.BoundStalling(10, 1e-6)],
-    duality_handler = SDDP.BanditDuality(),
 )
 
 report(filename_A, filename_B)
+=#
+
