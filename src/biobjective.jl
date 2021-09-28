@@ -96,6 +96,7 @@ function train_biobjective(
     solution_limit::Int,
     include_timing::Bool = false,
     log_file_prefix::String = "SDDP",
+    stopping_rules::Function = weight -> SDDP.AbstractStoppingRule[],
     kwargs...,
 )
     start_time = time()
@@ -112,6 +113,7 @@ function train_biobjective(
             add_to_existing_cuts = true,
             run_numerical_stability_report = false,
             log_file = "$(log_file_prefix)_$(weight).log",
+            stopping_rules = stopping_rules(weight),
             kwargs...,
         )
         solutions[weight] = value(SDDP.calculate_bound(model))
@@ -126,6 +128,7 @@ function train_biobjective(
             add_to_existing_cuts = true,
             run_numerical_stability_report = false,
             log_file = "$(log_file_prefix)_$(w).log",
+            stopping_rules = stopping_rules(weight),
             kwargs...,
         )
         bound = SDDP.calculate_bound(model)

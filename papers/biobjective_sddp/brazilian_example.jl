@@ -200,27 +200,13 @@ end
     experiment_2(N::Int, atol::Float64)
 
 Run an experiment in which we time how long it takes to solve N different
-policies using the saddle cuts.
+policies.
 """
 function experiment_2(N::Int, atol::Float64)
     # Precompilation to avoid measuring that overhead!
-    _model = create_model()
-    SDDP.train_biobjective(
-        _model;
-        solution_limit = 1,
-        iteration_limit = 1,
-        print_level = 0,
-    )
+    _model = create_model(1.0)
+    SDDP.train(_model; iteration_limit = 1, print_level = 0)
     # Now the real model
-    model = create_model()
-    solutions = SDDP.train_biobjective(
-        model;
-        solution_limit = N,
-        include_timing = true,
-        print_level = 1,
-        log_file_prefix = "experiment_2",
-        stopping_rules = [SDDP.BoundStalling(10, atol)],
-    )
     weights = [0.0, 1.0]
     queue = [(0.0, 1.0)]
     while length(weights) < N
@@ -230,10 +216,21 @@ function experiment_2(N::Int, atol::Float64)
         push!(queue, (a, c))
         push!(queue, (c, b))
     end
-    open("experiment_2.dat", "w") do io
-        for weight in weights
-            bound, time = solutions[weight]
-            println(io, weight, ", ", bound, ", ", time)
+    start_time = time()
+    for weight in weights
+        model = create_model(weight)
+        SDDP.train(
+            model;
+            log_file = "experiment_2_$(weight).txt",
+            stopping_rules = [SDDP.BoundStalling(10, atol)],
+            # Turn of cut selection for this experiment. We don't have it for
+            # the interpolation stuff.
+            cut_deletion_minimum = 10_000,
+
+        )
+        bound = SDDP.calculate_bound(model)
+        open("experiment_2.dat", "a") do io
+            println(io, weight, ", ", bound, ", ", time() - start_time)
         end
     end
     return
@@ -241,37 +238,41 @@ end
 
 """
     experiment_3()
+
+Run an experiment in which we time how long it takes to solve the problems from
+experiment_2 using the saddle cuts.
 """
 function experiment_3()
     # Precompilation to avoid measuring that overhead!
-    _model = create_model(1.0)
-    SDDP.train(_model; iteration_limit = 1, print_level = 0)
-    limits = Pair{Float64,BoundLimit}[]
-    time_limit = 0
+    _model = create_model()
+    SDDP.train_biobjective(
+        _model;
+        solution_limit = 1,
+        iteration_limit = 1,
+        print_level = 0,
+    )
+    # Now the real model
+    limit_pairs = Pair{Float64,BoundLimit}[]
     open("experiment_2.dat", "r") do io
         for line in readlines(io)
             items = parse.(Float64, String.(split(line, ",")))
-            push!(limits, items[1] => BoundLimit(items[2]))
-            time_limit = max(time_limit, items[end])
+            push!(limit_pairs, items[1] => BoundLimit(items[2]))
         end
     end
-    # Now the real model
-    start_time = time()
-    for (weight, stopping_rule) in limits
-        model = create_model(weight)
-        SDDP.train(
-            model;
-            log_file = "experiment_3_$(weight).txt",
-            stopping_rules = [stopping_rule],
-            time_limit = time_limit,
-            # Turn of cut selection for this experiment. We don't have it for
-            # the interpolation stuff.
-            cut_deletion_minimum = 10_000,
-
-        )
-        bound = SDDP.calculate_bound(model)
-        open("experiment_3.dat", "a") do io
-            println(io, weight, ", ", bound, ", ", time() - start_time)
+    limit_dict = Dict(limit_pairs)
+    model = create_model()
+    solutions = SDDP.train_biobjective(
+        model;
+        solution_limit = N,
+        include_timing = true,
+        print_level = 1,
+        log_file_prefix = "experiment_3",
+        stopping_rules = weight -> limit_dict[weight],
+    )
+    open("experiment_3.dat", "w") do io
+        for (weight, _) in limit_pairs
+            bound, time = solutions[weight]
+            println(io, weight, ", ", bound, ", ", time)
         end
     end
     return
