@@ -180,6 +180,7 @@ Terminate once the bound is better than `limit`.
 """
 struct BoundLimit <: SDDP.AbstractStoppingRule
     limit::Float64
+    atol::Float64
 end
 
 SDDP.stopping_rule_status(::BoundLimit) = :bound_limit
@@ -190,9 +191,9 @@ function SDDP.convergence_test(
     rule::BoundLimit,
 )
     if model.objective_sense == MOI.MIN_SENSE
-        return log[end].bound >= rule.limit - 1e-6
+        return log[end].bound >= rule.limit - rule.atol
     else
-        return log[end].bound <= rule.limit + 1e-6
+        return log[end].bound <= rule.limit + rule.atol
     end
 end
 
@@ -237,12 +238,12 @@ function experiment_2(N::Int, atol::Float64)
 end
 
 """
-    experiment_3()
+    experiment_3(atol::Float64)
 
 Run an experiment in which we time how long it takes to solve the problems from
 experiment_2 using the saddle cuts.
 """
-function experiment_3()
+function experiment_3(atol::Float64)
     # Precompilation to avoid measuring that overhead!
     _model = create_model()
     SDDP.train_biobjective(
@@ -256,7 +257,7 @@ function experiment_3()
     open("experiment_2.dat", "r") do io
         for line in readlines(io)
             items = parse.(Float64, String.(split(line, ",")))
-            push!(limit_pairs, items[1] => BoundLimit(items[2]))
+            push!(limit_pairs, items[1] => BoundLimit(items[2], atol))
         end
     end
     limit_dict = Dict(limit_pairs)
@@ -314,7 +315,7 @@ function main()
             something(arg(Float64, "-atol"), 1e2),
         )
     elseif findfirst(isequal("--experiment=3"), ARGS) !== nothing
-        experiment_3()
+        experiment_3(something(arg(Float64, "-atol"), 1e2))
     else
         help()
     end
