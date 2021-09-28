@@ -263,7 +263,7 @@ function experiment_3()
     model = create_model()
     solutions = SDDP.train_biobjective(
         model;
-        solution_limit = N,
+        solution_limit = length(limit_pairs),
         include_timing = true,
         print_level = 1,
         log_file_prefix = "experiment_3",
