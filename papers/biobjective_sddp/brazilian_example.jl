@@ -267,7 +267,7 @@ function experiment_3()
         include_timing = true,
         print_level = 1,
         log_file_prefix = "experiment_3",
-        stopping_rules = weight -> limit_dict[weight],
+        stopping_rules = weight -> [limit_dict[weight]],
     )
     open("experiment_3.dat", "w") do io
         for (weight, _) in limit_pairs
