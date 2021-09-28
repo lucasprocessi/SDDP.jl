@@ -128,7 +128,7 @@ function train_biobjective(
             add_to_existing_cuts = true,
             run_numerical_stability_report = false,
             log_file = "$(log_file_prefix)_$(w).log",
-            stopping_rules = stopping_rules(weight),
+            stopping_rules = stopping_rules(w),
             kwargs...,
         )
         bound = SDDP.calculate_bound(model)
